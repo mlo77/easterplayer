@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var collection
+var collection *mgo.Collection
 
 type Comment struct {
 	Id     string   `json:"id" bson:"_id,omitempty"`
@@ -40,13 +40,13 @@ func handleGetComments (mediaid string, w http.ResponseWriter, r *http.Request) 
 }
 
 func handlePostComment (mediaid string, w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(req.Body)
+	decoder := json.NewDecoder(r.Body)
 	var c Comment
 	err := decoder.Decode(&c)
-	c.Time = time.Now()
+	c.Time = time.Now().Format(time.UnixDate)
 	c.MediaId = mediaid
 	// Insert Datas
-	err := collection.Insert(&c)
+	err = collection.Insert(&c)
 	if err != nil {
 		http.Error(w, "bad request", http.StatusInternalServerError)
 		return
@@ -93,6 +93,6 @@ func main() {
 
 	http.Handle("/", http.FileServer(http.Dir(".")))
 	http.HandleFunc("/comments/", commentapi)
-	fmt.Println("listen on 3000")
-	http.ListenAndServe(":3000", nil)
+	fmt.Println("listen on 3001")
+	http.ListenAndServe(":3001", nil)
 }
