@@ -13,10 +13,10 @@ import (
 var collection *mgo.Collection
 
 type Comment struct {
-	Id     string   `json:"id" bson:"_id,omitempty"`
-    Type   int      `json:"type"` // code, footnote
-    Start  int 		`json:"start"`
-    End    int 		`json:"end"`
+    Id     bson.ObjectId   `json:"id" bson:"_id,omitempty"`
+    Type   string      `json:"type"` // code, footnote
+    Start  float32 		`json:"start"`
+    End    float32		`json:"end"`
     Text   string   `json:"text"`
     Author string   `json:"author"`
     Time   string	`json:"time"`
@@ -31,6 +31,7 @@ func handleGetComments (mediaid string, w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "bad request", http.StatusInternalServerError)
 			return
 		}
+		//fmt.Println(results[0])
 		m, err := json.Marshal(results)
 		if err != nil {
 			http.Error(w, "bad request", http.StatusInternalServerError)
@@ -59,7 +60,7 @@ func handleDeleteComment (mediaid string, w http.ResponseWriter, r *http.Request
 		http.Error(w, "bad request", http.StatusInternalServerError)
 		return
 	}
-	collection.Remove(bson.M{"_id": commentid})
+	collection.Remove(bson.M{"_id": bson.ObjectIdHex(commentid)})
 }
 
 func commentapi(w http.ResponseWriter, r *http.Request) {
