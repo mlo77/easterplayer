@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<title>targets</title>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #f0f0f0;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#progbar {
+				height: 5px;
+				width: 100%;
+				background-color: blue;
+				margin-bottom: 10px;
+			}
+
+			#cursor {
+				height: 10px;
+				width: 5px;
+				background-color: green;
+				margin-left: 0px;
+    			margin-top: -2px;
+			}
+
+			.commentItem {
+				height : 10px;
+				width : 3px;
+				background-color: orange;
+				margin-top: -20px;
+			}
+
+		</style>
+
+		<script src="libs/popcorn-complete.min.js"></script>
+		<script src="libs/jquery.min.js" charset="utf-8"></script>
+		<script src="libs/d3.min.js" charset="utf-8"></script>
+		<script src="libs/three.min.js"></script>
+		<!-- Latest compiled and minified CSS -->
+		<link rel="stylesheet" href="libs/bootstrap/css/bootstrap.min.css">
+
+		<!-- Optional theme -->
+		<link rel="stylesheet" href="libs/bootstrap/css/bootstrap-theme.min.css">
+
+		<!-- Latest compiled and minified JavaScript -->
+		<script src="libs/bootstrap/js/bootstrap.min.js"></script>
+	</head>
+	<body>
+
+
+	    <div id='main' class='row'>
+	    	<div id='list' class='col-md-3' style='overflow-y: scroll;'></div>
+	    	<div class='col-md-5'>
+	    		<div id='scene' class='row'>
+					<video height="180" width="300" id="video" autoplay controls> 
+					</video>
+	    		</div>
+	    		<div id='progbar' class='row' ondrop="drop(event)" ondragover="allowDrop(event)">
+	    			<div id='cursor'></div>
+	    		</div>
+	    		<div id='commentFlags' class='row'></div>
+				<div class="input-group row" draggable=true ondragstart="drag(event)">
+				  <span class="input-group-addon" id="basic-addon1">@</span>
+				  <input type="text" class="form-control" placeholder="Username" aria-describedby="basic-addon1">
+				</div>
+
+	    	</div>
+	    	<div class='col-md-4'>
+	    		<pre class='row'>
+	    			<div id="comments"></div>
+	    		</pre> 
+	    	</div>
+	    </div>
+
+
+		<script>
+
+			var isPlaying = false
+			var progBarTimer
+			var videoElmt = document.getElementById('video')
+			var cursor = document.getElementById('cursor')
+			var progBar = document.getElementById('progbar')
+			var currentVideoName
+
+		    // Listen for durationchange event
+			videoElmt.addEventListener( "durationchange", function( e ) {
+				console.log( videoElmt.duration );
+				GetComments(currentVideoName)
+				pop.play()
+				startUpdateProgressBar()
+				isPlaying = true
+			}, false );
+
+			progBar.addEventListener( 'mousedown', function(a){
+				// console.log(a)
+				var x = a.pageX - $(progBar).offset().left
+				x /= progBar.offsetWidth
+				console.log(x)
+
+				videoElmt.currentTime = x * videoElmt.duration
+			}, false );
+
+			// Create a popcporn instance by calling Popcorn("#id-of-my-video")
+			var pop = Popcorn("#video");
+
+
+			function allowDrop(ev) {
+			    ev.preventDefault();
+			}
+
+			function drag(ev) {
+			    ev.dataTransfer.setData("Text", ev.target.id);
+			}
+
+			function drop(ev) {
+				var x = ev.pageX - $(progBar).offset().left
+				x /= progBar.offsetWidth
+				console.log(x)
+
+			    // var data = ev.dataTransfer.getData("Text");
+			    // ev.target.appendChild(document.getElementById(data));
+			    ev.preventDefault();
+			}
+
+			GetListVideos = function () {
+				d3.html(window.location.origin+'/videos', function(t) {
+					//console.log(t)
+					var T = $(t).children().children()
+					for (var i=0; i<T.length; i++) {
+						$(T[i]).click(function() {
+							console.log(this.text)
+
+							isPlaying = false
+							if (progBarTimer) {
+								clearInterval(progBarTimer)
+								progBarTimer = undefined
+							}
+
+							videoElmt.src = window.location.origin+'/videos/'+this.text
+							currentVideoName = this.text;
+
+							// GetComments(this.text)		
+
+							return false
+						})
+					}
+					document.getElementById('list').appendChild(t)
+				})
+			}
+
+			function GetComments(videoName) {
+				$.ajax({
+					url: window.location.origin+"/comments/"+videoName, 
+					success: function(result){
+						var comments = JSON.parse(result)
+						console.log(comments)
+						for (var i=0; i<comments.length; i++) {
+							pop.footnote({
+						      start: comments[i].start,
+						      end: comments[i].end,
+						      text: comments[i].text,
+						      target: "comments"
+						    });
+						    addCommentFlag(parseInt(comments[i].start))
+						}
+					}
+				})
+			}
+
+
+			function addCommentFlag(pos) {
+				$('<div></div>')
+					.attr('class', 'commentItem')
+					.css({"margin-left":(pos*100/videoElmt.duration)+'%'})
+					.appendTo('#commentFlags')
+			}
+
+			function startUpdateProgressBar() {
+				stopUpdateProgressBar()				
+				progBarTimer = setInterval(function () {
+					cursor.style.marginLeft = videoElmt.currentTime * 100 / videoElmt.duration + '%'
+				}, 200)
+			}
+
+			function stopUpdateProgressBar() {
+				if (progBarTimer) {
+					clearInterval(progBarTimer)
+					progBarTimer = undefined
+				}
+			}
+
+			GetListVideos()
+
+
+
+		</script>
+
+		
+	</body>
+</html>
