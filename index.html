@@ -29,9 +29,11 @@
 
 			.commentItem {
 				height : 10px;
-				width : 3px;
+				width : 6px;
 				background-color: orange;
-				margin-top: -20px;
+				/*margin-top: -20px;*/
+				position: absolute;
+				top : 0px;
 			}
 
 		</style>
@@ -39,7 +41,7 @@
 		<script src="libs/popcorn-complete.min.js"></script>
 		<script src="libs/jquery.min.js" charset="utf-8"></script>
 		<script src="libs/d3.min.js" charset="utf-8"></script>
-		<script src="libs/three.min.js"></script>
+		<!-- <script src="libs/three.min.js"></script> -->
 		<!-- Latest compiled and minified CSS -->
 		<link rel="stylesheet" href="libs/bootstrap/css/bootstrap.min.css">
 
@@ -56,16 +58,16 @@
 	    	<div id='list' class='col-md-3' style='overflow-y: scroll;'></div>
 	    	<div class='col-md-5'>
 	    		<div id='scene' class='row'>
-					<video height="180" width="300" id="video" autoplay controls> 
+					<video width="100%" id="video" autoplay controls  ondrop="dropCommentVideo(event)" ondragover="allowDrop(event)"> 
 					</video>
 	    		</div>
-	    		<div id='progbar' class='row' ondrop="drop(event)" ondragover="allowDrop(event)">
+	    		<div id='progbar' class='row' ondrop="dropCommentTimeLine(event)" ondragover="allowDrop(event)">
 	    			<div id='cursor'></div>
 	    		</div>
 	    		<div id='commentFlags' class='row'></div>
-				<div class="input-group row" draggable=true ondragstart="drag(event)">
-				  <span class="input-group-addon" id="basic-addon1">@</span>
-				  <input type="text" class="form-control" placeholder="Username" aria-describedby="basic-addon1">
+				<div class="input-group row" draggable=true>
+  			  	  <input id='usrnamefield' type="text" class="form-control" placeholder="Your name" aria-describedby="basic-addon1">
+				  <textarea id='commentfield' class="span9 col-md-12" rows="3" placeholder="Your comment. Drag and drop in the video frame or the video timeline." required></textarea>
 				</div>
 
 	    	</div>
@@ -84,11 +86,13 @@
 			var videoElmt = document.getElementById('video')
 			var cursor = document.getElementById('cursor')
 			var progBar = document.getElementById('progbar')
+			var duration
 			var currentVideoName
 
 		    // Listen for durationchange event
 			videoElmt.addEventListener( "durationchange", function( e ) {
 				console.log( videoElmt.duration );
+				duration = videoElmt.duration
 				GetComments(currentVideoName)
 				pop.play()
 				startUpdateProgressBar()
@@ -112,18 +116,45 @@
 			    ev.preventDefault();
 			}
 
-			function drag(ev) {
-			    ev.dataTransfer.setData("Text", ev.target.id);
+			function postComment(payload) {
+				if (currentVideoName == undefined) 
+					return
+				$.ajax({
+				    type: "POST",
+				    url: window.location.origin+"/comments/?mediaid="+currentVideoName,
+				    data: JSON.stringify(payload),
+				    contentType: "application/json; charset=utf-8",
+				    dataType: "json"
+				})				
 			}
 
-			function drop(ev) {
+			function dropCommentVideo(ev) {
+			    ev.preventDefault();
+			    var pl = {
+			    	start : videoElmt.currentTime,
+			    	end : videoElmt.currentTime + 3,
+			    	text : document.getElementById('commentfield').value,
+			    	author : document.getElementById('usrnamefield').value,
+			    	mediaid : currentVideoName
+			    }
+			    postComment(pl)
+			}
+
+			function dropCommentTimeLine(ev) {
 				var x = ev.pageX - $(progBar).offset().left
 				x /= progBar.offsetWidth
 				console.log(x)
 
-			    // var data = ev.dataTransfer.getData("Text");
-			    // ev.target.appendChild(document.getElementById(data));
 			    ev.preventDefault();
+
+			    var pl = {
+			    	start : x * videoElmt.duration,
+			    	end : x * videoElmt.duration + 3,
+			    	text : document.getElementById('commentfield').value,
+			    	author : document.getElementById('usrnamefield').value,
+			    	mediaid : currentVideoName
+			    }
+			    postComment(pl)
 			}
 
 			GetListVideos = function () {
@@ -154,29 +185,35 @@
 
 			function GetComments(videoName) {
 				$.ajax({
-					url: window.location.origin+"/comments/"+videoName, 
+					url: window.location.origin+"/comments/?mediaid="+videoName, 
 					success: function(result){
 						var comments = JSON.parse(result)
 						console.log(comments)
+						$('#commentFlags').empty()
 						for (var i=0; i<comments.length; i++) {
 							pop.footnote({
 						      start: comments[i].start,
 						      end: comments[i].end,
-						      text: comments[i].text,
+						      text: comments[i].author+' says:'+comments[i].text+'\n',
 						      target: "comments"
 						    });
-						    addCommentFlag(parseInt(comments[i].start))
+						    addCommentFlag(parseInt(comments[i].start), i, comments[i].author, comments[i].text )
 						}
 					}
 				})
 			}
 
 
-			function addCommentFlag(pos) {
+			function addCommentFlag(pos, count, author, text) {
 				$('<div></div>')
 					.attr('class', 'commentItem')
-					.css({"margin-left":(pos*100/videoElmt.duration)+'%'})
+					.css({"margin-left":(pos*100/duration)+'%'})
+					// .css({"margin-top":(count > 1? -10:-20) +'px'})
 					.appendTo('#commentFlags')
+					.hover(function(){
+						document.getElementById('usrnamefield').value = author
+						document.getElementById('commentfield').value = text
+					})
 			}
 
 			function startUpdateProgressBar() {
